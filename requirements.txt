@@ -1,0 +1,49 @@
+from fastapi import FastAPI, HTTPException, File, UploadFile, Response, Body
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from starlette.requests import Request
+import boto3
+import openai
+import os
+
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+polly = boto3.client("polly")
+
+@app.post("/summarize")
+async def summarize(request: Request):
+    data = await request.json()
+    text = data.get("text")
+    if not text:
+        return JSONResponse(status_code=400, content={"error": "Text is required"})
+    # Summarization logic here
+    summary = "This is a summary."
+    return {"summary": summary}
+
+@app.post("/tts")
+async def tts(request: dict = Body(...)):
+    """
+    Convert provided text to speech using AWS Polly and return MP3 audio.
+    """
+    text = request.get("text")
+    if not text:
+        raise HTTPException(status_code=400, detail="Field 'text' is required")
+    try:
+        resp = polly.synthesize_speech(
+            Text=text,
+            OutputFormat="mp3",
+            VoiceId="Mizuki",
+            Engine="standard"
+        )
+        audio_stream = resp["AudioStream"].read()
+        return Response(content=audio_stream, media_type="audio/mpeg")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Polly error: {e}")
